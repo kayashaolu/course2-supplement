@@ -10,7 +10,7 @@
 
 """
 Systems Thinking in the AI Era II: Content & Information Systems
-Lesson 3: Service + File Store Media Handling Discovery Lab
+Lab 1: Service + File Store Media Handling Discovery Lab
 Interactive Python Application
 
 This application guides students through four progressive experiments that
@@ -50,7 +50,7 @@ except ImportError:
 
 
 class LabExperience:
-    """Interactive lab experience for Lesson 3: Service + File Store"""
+    """Interactive lab experience for Lab 1: Service + File Store"""
 
     def __init__(self, student_name: str = "Student"):
         self.student_name = student_name
@@ -200,7 +200,7 @@ class LabExperience:
     def run_welcome(self):
         self.print_header("WELCOME TO SYSTEMS THINKING IN THE AI ERA")
         print("\n🎓 Systems Thinking in the AI Era II: Content & Information Systems")
-        print("📚 Lesson 3: Service + File Store Media Handling Discovery Lab\n")
+        print("📚 Lab 1: Service + File Store Media Handling Discovery Lab\n")
 
         self.typewriter_print("Transform from a code writer who stuffs binaries into databases")
         self.typewriter_print("to a system thinker who knows exactly where bytes belong.")

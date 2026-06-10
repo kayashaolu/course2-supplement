@@ -10,7 +10,7 @@
 
 """
 Systems Thinking in the AI Era II: Content & Information Systems
-Lesson 8: Service + Key-Value Store Caching Discovery Lab
+Lab 2: Service + Key-Value Store Caching Discovery Lab
 Interactive Python Application
 
 Four progressive experiments that build deep intuition for caching:
@@ -57,7 +57,7 @@ SIMULATED_DB_LATENCY_S = 0.05  # 50ms per database read
 
 
 class LabExperience:
-    """Interactive lab experience for Lesson 8: Service + Key-Value Store"""
+    """Interactive lab experience for Lab 2: Service + Key-Value Store"""
 
     def __init__(self, student_name: str = "Student"):
         self.student_name = student_name
@@ -206,7 +206,7 @@ class LabExperience:
     def run_welcome(self):
         self.print_header("WELCOME TO SYSTEMS THINKING IN THE AI ERA")
         print("\n🎓 Systems Thinking in the AI Era II: Content & Information Systems")
-        print("📚 Lesson 8: Service + Key-Value Store Caching Discovery Lab\n")
+        print("📚 Lab 2: Service + Key-Value Store Caching Discovery Lab\n")
 
         self.typewriter_print("Transform from a code writer who hopes the database is fast enough")
         self.typewriter_print("to a system thinker who knows exactly when and how to cache.")
