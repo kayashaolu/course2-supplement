@@ -13,7 +13,7 @@ This technical design document must focus on **building blocks and architectural
 **Use:**
 - Building block names: Service, Worker, Queue, Key-Value Store, File Store, Relational Database, Vector Database
 - External entities: User, External Service, Time
-- Technology-agnostic terms: cache, inverted index, full-text search, CDN, read replicas, async processing
+- Technology-agnostic terms that describe patterns (e.g., cache, index, full-text search, async processing)
 
 **Do NOT use:**
 - Specific technologies: PostgreSQL, Redis, Elasticsearch, RabbitMQ, Kafka, S3, MongoDB
@@ -27,6 +27,22 @@ The grader will look for pattern recognition and clear reasoning, not technology
 1. **Draw your architecture diagram** using the 7 building blocks + 3 external entities. Use [this Google Drawing template](https://docs.google.com/drawings/d/1hbx9r8NCBNjMDZv9tAXzfvLR3-XPsOgHm9zrX0h_cO8/edit?usp=sharing) to get started.
 2. **Use your diagram as reference** while writing your user flows and technical explanations.
 3. **Ensure consistency** between what you draw and what you write.
+
+## Flow notation: how to write flows
+
+Every flow in this document uses building-block notation. Here is the format, illustrated with a system this course does not cover — a city library's book-reservation system:
+
+```
+Reserve a book: User → Reservation Service → Relational Database (availability check) → Queue → Notification Worker → External Service (SMS)
+Browse the catalog: User → Catalog Service + Key-Value Store → Relational Database (on cache miss)
+```
+
+- Use EXACT building block names
+- Use `+` for combinations (e.g., Queue + Worker)
+- Start each flow with the external entity that triggers it
+- Annotate a step's purpose in parentheses when it is not obvious
+
+Your flows should look like this in notation — the architecture is yours to design.
 
 ---
 
@@ -55,24 +71,13 @@ The grader will look for pattern recognition and clear reasoning, not technology
 
 ### User Flow Design
 
-**Building block requirements:**
-- Use EXACT building block names
-- Use `+` for combinations (e.g., Queue + Worker)
-- Identify the **external entity** that initiates this work (hint: it's not a User)
-
-```
-Example formats:
-Scheduled news fetch: Time → Ingestion Worker → External Service (news API) → Relational Database
-Article normalization: Queue → Normalization Worker → Relational Database
-```
-
 **Your news aggregation flows:**
-[Write 2-4 specific flows for the ingestion path]
+[Write 2-4 specific flows for the ingestion path, using the notation shown at the top of this document. Think about which external entity initiates this work.]
 
 ### Architecture Decisions & Trade-offs
 
 **Key architectural decisions:**
-- **[Decision 1]**: [Why Time + Worker rather than something else?]
+- **[Decision 1]**: [Why this combination of blocks and entities rather than something else?]
 - **[Decision 2]**: [How do you handle failures when an external source is down?]
 - **[Decision 3]**: [How do you avoid ingesting duplicate articles?]
 
@@ -92,19 +97,13 @@ Article normalization: Queue → Normalization Worker → Relational Database
 
 ### User Flow Design
 
-```
-Example formats:
-Browse by topic: User → Article Service → Relational Database
-View article: User → Article Service → Relational Database
-```
-
 **Your article storage flows:**
 [Write 2-4 specific flows for browsing and metadata queries]
 
 ### Architecture Decisions & Trade-offs
 
 **Key architectural decisions:**
-- **[Decision 1]**: [Why Relational Database over another storage block?]
+- **[Decision 1]**: [Why this storage block over another storage block?]
 - **[Decision 2]**: [How do you handle articles that belong to multiple topics?]
 - **[Decision 3]**: [Where does the article body live, and why?]
 
@@ -122,27 +121,21 @@ View article: User → Article Service → Relational Database
 
 ### User Flow Design
 
-```
-Example formats:
-Search query: User → Search Service → Inverted Index (Key-Value Store)
-Index update: Article publish → Indexing Worker → Key-Value Store (inverted index)
-```
-
 **Your search flows:**
-[Write 2-4 specific flows for both query path and indexing path]
+[Write 2-4 specific flows covering both how a search is answered and how new articles become searchable]
 
 ### Architecture Decisions & Trade-offs
 
 **Key architectural decisions:**
-- **[Decision 1]**: [Why pre-processing rather than scanning at query time?]
-- **[Decision 2]**: [Trade-off between index freshness and indexing latency]
-- **[Decision 3]**: [How do you rank results within the index?]
+- **[Decision 1]**: [How does your design make search sub-second across millions of articles? What work happens when, and where?]
+- **[Decision 2]**: [Trade-off between result freshness and the cost of keeping search current]
+- **[Decision 3]**: [How do you rank results?]
 
 ### Technical Implementation Details
 
-**Indexing pipeline**: [When and how do new articles get indexed?]
+**Search data preparation**: [When and how do new articles become searchable?]
 
-**Query execution**: [What does the system do between user typing a query and returning results?]
+**Query execution**: [What does the system do between the user typing a query and returning results?]
 
 ---
 
@@ -152,27 +145,21 @@ Index update: Article publish → Indexing Worker → Key-Value Store (inverted 
 
 ### User Flow Design
 
-```
-Example formats:
-Hot article (cache hit):  User → Article Service → Key-Value Store
-Cache miss:               User → Article Service → Key-Value Store → Relational Database → (populate cache) → respond
-```
-
 **Your caching flows:**
-[Write 2-4 specific flows showing both cache hit and miss paths]
+[Write 2-4 specific flows showing how popular articles are served fast, and what happens when the fast path cannot answer]
 
 ### Architecture Decisions & Trade-offs
 
 **Key architectural decisions:**
-- **[Decision 1]**: [Why a Key-Value Store specifically? What pattern (cache-aside, write-through, etc.)?]
-- **[Decision 2]**: [TTL strategy or active invalidation? Why?]
+- **[Decision 1]**: [Which block serves the hot path, and what pattern governs how it is filled and read?]
+- **[Decision 2]**: [How does cached content stay acceptably fresh? Why that approach?]
 - **[Decision 3]**: [What happens when an article is updated?]
 
 ### Technical Implementation Details
 
 **Cache keys and values**: [What's the key? What's the value? How big is the value?]
 
-**Invalidation strategy**: [How do you keep cache and database in sync?]
+**Invalidation strategy**: [How do you keep the fast path and the system of record in sync?]
 
 ---
 
@@ -182,18 +169,13 @@ Cache miss:               User → Article Service → Key-Value Store → Relat
 
 ### User Flow Design
 
-```
-Example formats:
-Article read with analytics: User → Article Service → respond → emit to Analytics Queue → Analytics Worker → analytics store
-```
-
 **Your analytics flows:**
-[Write 2-4 flows showing how analytics is captured without blocking the read path]
+[Write 2-4 flows showing how analytics is captured without slowing the read path]
 
 ### Architecture Decisions & Trade-offs
 
 **Key architectural decisions:**
-- **[Decision 1]**: [Why fire-and-forget rather than synchronous logging?]
+- **[Decision 1]**: [How does your design keep analytics recording off the user's critical path? Why is that safe here?]
 - **[Decision 2]**: [Where do analytics events accumulate before being processed?]
 - **[Decision 3]**: [What storage shape suits the analytics queries you anticipate?]
 
@@ -201,7 +183,7 @@ Article read with analytics: User → Article Service → respond → emit to An
 
 **Event shape**: [What fields does each analytics event carry?]
 
-**Processing rate**: [How fast do Workers drain the analytics queue? What happens during traffic spikes?]
+**Processing rate**: [How fast does analytics work get processed? What happens during traffic spikes?]
 
 ---
 
@@ -227,12 +209,6 @@ Article read with analytics: User → Article Service → respond → emit to An
 ### What this MVP intentionally does NOT address
 
 [Anything you're deferring to Part 2 or Part 3 — be explicit about what's out of scope. The grader rewards designs that know their boundaries.]
-
-### Self-graded rubric (A / A- / B+)
-
-**My grade**: [A / A- / B+]
-
-**Why I assigned this grade**: [One paragraph using the rubric from Lesson 2 — A means all requirements + optimal blocks + trade-offs acknowledged, A- means strong with one precision gap, B+ means solid with one domain-specific gap]
 
 ---
 

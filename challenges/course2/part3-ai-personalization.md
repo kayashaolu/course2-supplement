@@ -16,11 +16,20 @@ Your Part 2 platform handles viral traffic gracefully. But user feedback reveals
 
 This document is the **final evolution** — layering AI capabilities on top of your scaled Part 2 architecture. AI is added, not bolted on. The patterns from Parts 1 and 2 should remain intact and operational.
 
-## IMPORTANT: Building Block Classification Matters Here
+## IMPORTANT: Classification Matters Here
 
-Cloud LLMs (like OpenAI, Anthropic, Gemini) are **External Services**, not File Stores. A locally-run model uses Service + File Store (for weights), but the cloud API call goes through External Service. The grader will check this classification — it's part of the grade.
+Part of the grade is classifying third-party AI capabilities into the correct building blocks and external entities. Apply the classification rules from the lessons carefully — a capability described with the wrong block costs points.
 
-Vector embeddings live in a **Vector Database**, not in a Key-Value Store or a Relational Database. The Vector DB is the one new building block this challenge requires.
+## Flow notation: how to write flows
+
+Every flow in this document uses building-block notation. Here is the format, illustrated with a system this course does not cover — a city library's book-reservation system:
+
+```
+Reserve a book: User → Reservation Service → Relational Database (availability check) → Queue → Notification Worker → External Service (SMS)
+Browse the catalog: User → Catalog Service + Key-Value Store → Relational Database (on cache miss)
+```
+
+Your flows should look like this in notation — the architecture is yours to design.
 
 ---
 
@@ -48,27 +57,19 @@ This requirement splits into two distinct capabilities. Address both.
 
 ### User Flow Design
 
-```
-Example formats:
-Pre-compute personalized feed: Time → Personalization Worker → Vector Database + Read Cache
-Serve personalized feed:       User → Feed Service → Read Cache (pre-computed feed)
-Update user profile:           User reads article → Analytics Queue → Profile Worker → User Profile Store
-```
-
 **Your personalization flows:**
-[Write 2-4 specific flows showing how user behavior becomes recommendations]
+[Write 2-4 specific flows showing how user behavior becomes recommendations, and how a personalized feed gets served fast]
 
 ### Building Blocks Added
 
-- **[Vector Database]**: [Stores what? Used how?]
-- **[User Profile Store]**: [What shape? Vector? Topic weights? Both?]
-- **[Personalization Worker]**: [Triggered when? Does what?]
-- **[Personalized Feed Cache]**: [Why pre-compute rather than compute at read time?]
+- **[Block or entity 1]**: [What it stores or does, and why this block is the right classification]
+- **[Block or entity 2]**: [Same]
+- **[Block or entity 3]**: [Same]
 
 ### Architecture Decisions & Trade-offs
 
-- **[Decision 1]**: [Why pre-compute personalized feeds offline rather than at read time?]
-- **[Decision 2]**: [How fresh is "fresh enough" for a personalized news feed? What TTL or invalidation strategy?]
+- **[Decision 1]**: [When and where does personalization work happen, and why there?]
+- **[Decision 2]**: [How fresh is "fresh enough" for a personalized news feed, and how does your design deliver that?]
 - **[Decision 3]**: [How does this scale to millions of users with unique profiles?]
 
 ---
@@ -77,61 +78,44 @@ Update user profile:           User reads article → Analytics Queue → Profil
 
 ### User Flow Design
 
-```
-Example formats:
-Article ingestion → embedding: New article published → Embedding Worker → External Service (embedding API) → Vector Database
-Semantic search query:         User → Search Service → External Service (embedding API) → Vector Database → Ranking Service → Read Cache (response)
-```
-
 **Your semantic search flows:**
-[Write 2-4 specific flows showing the RAG pattern applied to news]
+[Write 2-4 specific flows showing how articles become findable by meaning and how a natural-language query gets answered]
 
 ### Building Blocks Added
 
-- **[Embedding Worker]**: [Triggered when? Does what? Why a Worker rather than the upload Service doing it inline?]
-- **[External Service — embedding API]**: [Used for what? At which stages?]
-- **[External Service — LLM API]** (if applicable): [Used for what? Answer generation? Query understanding?]
+- **[Block or entity 1]**: [What it stores or does, when it is involved, and why this block is the right classification]
+- **[Block or entity 2]**: [Same]
+- **[Block or entity 3]**: [Same]
 
 ### Architecture Decisions & Trade-offs
 
-- **[Decision 1]**: [Why use a managed embedding API rather than running your own model?]
-- **[Decision 2]**: [How do you avoid sending the same query to the embedding API repeatedly?]
+- **[Decision 1]**: [What you chose to build versus consume, and why]
+- **[Decision 2]**: [How do you control the cost of repeated identical work in this path?]
 - **[Decision 3]**: [What's the latency budget for semantic search vs traditional keyword search?]
 
 ---
 
-## The Three Classic Trade-offs
+## Trade-offs of AI Personalization
 
-A strong Part 3 submission names these explicitly.
+A strong Part 3 submission names the hard trade-offs explicitly. Identify at least three tensions that adding AI personalization to a news platform creates, and state how your architecture lands on each. For each one:
 
-### Freshness vs Cost
-
-[News is time-sensitive — a personalized feed that's 8 hours old has missed a news cycle. But regenerating personalization for every user on every request is prohibitively expensive. How do you balance? Be specific about TTLs, refresh triggers, and cost estimates.]
-
-### Cold Start
-
-[A brand-new user has no behavior history. What does the feed look like for them on day one? Your options: editorial defaults, onboarding surveys, implicit cold start (observe and adapt). Pick one and justify.]
-
-### Filter Bubbles vs Exploration
-
-[A personalization system that only shows users what they already like creates filter bubbles. For a news platform, you may have an editorial responsibility to expose users to important stories outside their interest profile. How do you architect for that?]
+**[Tension]**: [What pulls in each direction, the choice you made, and the specific architectural mechanism that implements that choice.]
 
 ---
 
 ## Graceful Degradation: Designing for AI Failure
 
-AI services fail. The LLM API has an outage. The embedding service rate-limits you. The Vector Database needs reindexing. Your platform cannot go down when AI does.
+AI services fail. Your platform cannot go down when AI does.
 
 For each AI capability, define the fallback:
 
 | AI capability | Primary path | Fallback when AI is unavailable |
 |---|---|---|
-| Personalized feed | [Pre-computed feed from cache] | [Generic popular-articles feed?] |
-| Semantic search | [Vector DB + embedding API] | [Keyword search from Part 1?] |
-| Embedding new articles | [External Service embedding API] | [Queue with retry; articles still searchable by keyword in the meantime?] |
+| Personalized feed | [Your primary path] | [Your fallback] |
+| Semantic search | [Your primary path] | [Your fallback] |
 | [Add your own] | [Primary path] | [Fallback path] |
 
-**Architectural principle**: [State explicitly — the platform should still work even if every AI service is down for an hour. AI enhances; AI is not load-bearing for the core product.]
+**Architectural principle**: [State explicitly what your design guarantees about the core product when AI capabilities are unavailable.]
 
 ---
 
@@ -159,14 +143,6 @@ Provide a complete architecture diagram (or detailed text description) showing:
 ## What This Architecture Intentionally Does NOT Address
 
 [Be honest about what's out of scope. Examples: real-time collaboration on articles, multi-language support, video personalization. The grader rewards designs that know their boundaries.]
-
----
-
-## Self-Graded Rubric (A / A- / B+)
-
-**My grade**: [A / A- / B+]
-
-**Why I assigned this grade**: [Apply the rubric from Lesson 2. Specifically check: did you classify cloud LLM calls as External Service (not File Store)? Did you address all three classic trade-offs explicitly? Did you provide explicit fallbacks for AI failure?]
 
 ---
 
