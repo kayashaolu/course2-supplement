@@ -70,6 +70,10 @@ class LabExperience:
         self.fast_typewriter_speed = 0.01
         self.instant_print = False
 
+        # True when invoked with an explicit experiment number — the lab ends
+        # after that experiment instead of chaining into the next one.
+        self.single_experiment_mode = False
+
         self.print_lock = threading.Lock()
         self.workspace = tempfile.mkdtemp(prefix="lab2_kvs_")
 
@@ -154,6 +158,21 @@ class LabExperience:
         self.wait_for_enter()
         return selected_choice
 
+    def offer_next(self, question: str, next_step):
+        """End-of-experiment chain: prompt into the next step.
+
+        This is the ONLY mechanism that advances the lab — run_full() starts
+        experiment 1 and each experiment chains forward from here, ending with
+        the summary. In single-experiment mode, stop after this experiment.
+        """
+        if self.single_experiment_mode:
+            print("\n📍 Experiment complete. Run the full lab "
+                  "(python3 lab2_service_kvs.py with no experiment number) "
+                  "for the remaining experiments and the discovery summary.")
+            return
+        if self.ask_yes_no(question):
+            next_step()
+
     # -----------------------------------------------------------------------
     # Shared setup: a small "articles" database
     # -----------------------------------------------------------------------
@@ -230,6 +249,9 @@ add up and the DB query count climb.
         self.wait_for_enter()
 
         db = self.setup_articles_db("bottleneck_db")
+        # Snapshot the query count so seeding the 100 articles doesn't get
+        # counted as read traffic — we report only the deltas below.
+        baseline_queries = db.get_stats()['query_count']
         service = Service("article_service_no_cache")
 
         @service.route("/article")
@@ -254,7 +276,7 @@ add up and the DB query count climb.
         total_time = time.time() - start_time
         self.experiment_times['experiment_1'] = total_time
 
-        db_query_count = db.get_stats()['query_count']
+        db_query_count = db.get_stats()['query_count'] - baseline_queries
         avg_latency_ms = (sum(latencies) / len(latencies)) * 1000
 
         print(f"\n📊 No-Cache Statistics:")
@@ -312,8 +334,8 @@ add up and the DB query count climb.
             ],
         )
 
-        if self.ask_yes_no("Ready to feel the relief of cache-aside?"):
-            self.experiment_2_cache_aside()
+        self.offer_next("Ready to feel the relief of cache-aside?",
+                        self.experiment_2_cache_aside)
 
     # =======================================================================
     # EXPERIMENT 2 — Cache-aside pattern
@@ -336,6 +358,9 @@ the average latency drop as the cache warms up.
         self.wait_for_enter()
 
         db = self.setup_articles_db("cached_db")
+        # Snapshot the query count so seeding the 100 articles doesn't get
+        # counted as read traffic — we report only the deltas below.
+        baseline_queries = db.get_stats()['query_count']
         cache = KeyValueStore("article_cache", max_size=200)
         service = Service("article_service_cached")
 
@@ -373,7 +398,7 @@ the average latency drop as the cache warms up.
                 self.direct_print(
                     f"   📊 {i+1}/{total_requests} reads — "
                     f"hit rate {rate*100:.0f}% — "
-                    f"DB queries so far: {db.get_stats()['query_count']}"
+                    f"DB queries so far: {db.get_stats()['query_count'] - baseline_queries}"
                 )
 
         total_time = time.time() - start_time
@@ -440,8 +465,8 @@ the average latency drop as the cache warms up.
             ],
         )
 
-        if self.ask_yes_no("Ready to wrestle with cache invalidation?"):
-            self.experiment_3_invalidation()
+        self.offer_next("Ready to wrestle with cache invalidation?",
+                        self.experiment_3_invalidation)
 
     # =======================================================================
     # EXPERIMENT 3 — Invalidation strategies
@@ -471,6 +496,7 @@ Watch how stale data appears (or doesn't) for readers in each strategy.
         cache = KeyValueStore("invalidation_cache", max_size=200)
 
         article_id = 42
+        start_time = time.time()
 
         def read_with_cache_aside(strategy_label: str):
             """Cache-aside read. Logs whether the read was stale."""
@@ -559,7 +585,7 @@ Watch how stale data appears (or doesn't) for readers in each strategy.
         if "ANOTHER" in r2["body"]:
             self.print_result("FRESH DATA. Write-through invalidation worked — no stale read.")
 
-        self.experiment_times['experiment_3'] = 20  # rough
+        self.experiment_times['experiment_3'] = time.time() - start_time
 
         self.print_header("EXPERIMENT 3 REFLECTIONS", style="sub")
 
@@ -605,8 +631,8 @@ Watch how stale data appears (or doesn't) for readers in each strategy.
             ],
         )
 
-        if self.ask_yes_no("Ready to face the thundering herd?"):
-            self.experiment_4_thundering_herd()
+        self.offer_next("Ready to face the thundering herd?",
+                        self.experiment_4_thundering_herd)
 
     # =======================================================================
     # EXPERIMENT 4 — Hot keys and the thundering herd
@@ -645,7 +671,14 @@ You'll simulate this scenario, then apply two fixes:
 
         db_query_count_start = db.get_stats()['query_count']
 
+        # Barrier so all 50 readers check the cache at the same instant —
+        # the true herd. Without it, the first reader to finish its DB fetch
+        # warms the cache for late starters and the stampede looks smaller
+        # than it really is.
+        herd_barrier = threading.Barrier(concurrent_readers)
+
         def vulnerable_read(reader_id: int, results: list):
+            herd_barrier.wait()  # everyone checks the cache simultaneously
             cached = cache.get(cache_key)
             if cached is not None:
                 results.append("HIT")
@@ -796,8 +829,7 @@ with request coalescing.
             ],
         )
 
-        if self.ask_yes_no("Ready to see your discovery summary?"):
-            self.show_summary()
+        self.offer_next("Ready to see your discovery summary?", self.show_summary)
 
     # =======================================================================
     # Summary
@@ -845,18 +877,19 @@ You're ready.
     # =======================================================================
 
     def run_full(self):
+        # Experiments chain themselves forward via offer_next() — experiment 1
+        # leads to 2, and so on, ending with the summary. Do NOT also call the
+        # later experiments here, or they would run twice (and crash against
+        # the workspace the summary already cleaned up).
         try:
             self.run_welcome()
             self.experiment_1_db_bottleneck()
-            self.experiment_2_cache_aside()
-            self.experiment_3_invalidation()
-            self.experiment_4_thundering_herd()
-            self.show_summary()
         finally:
             if os.path.exists(self.workspace):
                 shutil.rmtree(self.workspace, ignore_errors=True)
 
     def run_one(self, experiment_num: int):
+        self.single_experiment_mode = True
         try:
             mapping = {
                 1: self.experiment_1_db_bottleneck,

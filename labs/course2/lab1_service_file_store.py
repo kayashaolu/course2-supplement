@@ -63,6 +63,10 @@ class LabExperience:
         self.fast_typewriter_speed = 0.01
         self.instant_print = False
 
+        # True when invoked with an explicit experiment number — the lab ends
+        # after that experiment instead of chaining into the next one.
+        self.single_experiment_mode = False
+
         self.print_lock = threading.Lock()
 
         # Use a temp dir for File Store so the lab never pollutes the user's repo
@@ -156,6 +160,21 @@ class LabExperience:
         self.typewriter_print(educational_response)
         self.wait_for_enter()
         return selected_choice
+
+    def offer_next(self, question: str, next_step):
+        """End-of-experiment chain: prompt into the next step.
+
+        This is the ONLY mechanism that advances the lab — run_full() starts
+        experiment 1 and each experiment chains forward from here, ending with
+        the summary. In single-experiment mode, stop after this experiment.
+        """
+        if self.single_experiment_mode:
+            print("\n📍 Experiment complete. Run the full lab "
+                  "(python3 lab1_service_file_store.py with no experiment number) "
+                  "for the remaining experiments and the discovery summary.")
+            return
+        if self.ask_yes_no(question):
+            next_step()
 
     # -----------------------------------------------------------------------
     # Shared helpers for media work
@@ -332,8 +351,8 @@ database fills with binary data.
             ],
         )
 
-        if self.ask_yes_no("Ready to feel the relief of separating bytes from metadata?"):
-            self.experiment_2_service_plus_filestore()
+        self.offer_next("Ready to feel the relief of separating bytes from metadata?",
+                        self.experiment_2_service_plus_filestore)
 
     # =======================================================================
     # EXPERIMENT 2 — Service + File Store split
@@ -475,8 +494,8 @@ lean because it never has to hold a single byte of image data.
             ],
         )
 
-        if self.ask_yes_no("Ready to add async processing with Queue + Worker?"):
-            self.experiment_3_processing_pipeline()
+        self.offer_next("Ready to add async processing with Queue + Worker?",
+                        self.experiment_3_processing_pipeline)
 
     # =======================================================================
     # EXPERIMENT 3 — Media processing pipeline (Queue + Worker)
@@ -659,8 +678,8 @@ immediately while the thumbnail appears moments later.
             ],
         )
 
-        if self.ask_yes_no("Ready to add a CDN for global delivery?"):
-            self.experiment_4_cdn()
+        self.offer_next("Ready to add a CDN for global delivery?",
+                        self.experiment_4_cdn)
 
     # =======================================================================
     # EXPERIMENT 4 — CDN integration
@@ -808,8 +827,7 @@ hood — same pattern you already know.
             ],
         )
 
-        if self.ask_yes_no("Ready to see your discovery summary?"):
-            self.show_summary()
+        self.offer_next("Ready to see your discovery summary?", self.show_summary)
 
     # =======================================================================
     # Summary
@@ -858,18 +876,19 @@ embedded in your hands.
     # =======================================================================
 
     def run_full(self):
+        # Experiments chain themselves forward via offer_next() — experiment 1
+        # leads to 2, and so on, ending with the summary. Do NOT also call the
+        # later experiments here, or they would run twice (and crash against
+        # the workspace the summary already cleaned up).
         try:
             self.run_welcome()
             self.experiment_1_naive_blob_in_db()
-            self.experiment_2_service_plus_filestore()
-            self.experiment_3_processing_pipeline()
-            self.experiment_4_cdn()
-            self.show_summary()
         finally:
             if os.path.exists(self.workspace):
                 shutil.rmtree(self.workspace, ignore_errors=True)
 
     def run_one(self, experiment_num: int):
+        self.single_experiment_mode = True
         try:
             mapping = {
                 1: self.experiment_1_naive_blob_in_db,

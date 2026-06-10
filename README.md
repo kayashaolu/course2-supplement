@@ -28,9 +28,9 @@ course2-supplement/
 You need Python 3.8 or higher. No third-party packages are required — the labs use only the standard library.
 
 ```bash
-git clone https://github.com/systemthinkinglab/course2-supplement.git
+git clone https://github.com/kayashaolu/course2-supplement.git
 cd course2-supplement
-python3 labs/course2/lab1_service_file_store.py
+python3 labs/course2/lab1_service_file_store.py   # Windows: use 'py -3' and backslash paths
 ```
 
 ## Running the labs
